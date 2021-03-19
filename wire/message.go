@@ -24,7 +24,7 @@ const CommandSize = 12
 
 // MaxMessagePayload is the maximum bytes a message can be regardless of other
 // individual limits imposed by messages themselves.
-const MaxMessagePayload = (1024 * 1024 * 32) // 32MB
+const MaxMessagePayload = (1024 * 1024 * 512) // 512MB
 
 // Commands used in bitcoin message headers which describe the type of message.
 const (
@@ -51,6 +51,10 @@ const (
 	CmdReject      = "reject"
 	CmdSendHeaders = "sendheaders"
 	CmdFeeFilter   = "feefilter"
+	CmdProtoConf   = "protoconf"
+
+	CmdCreateStream = "createstrm"
+	CmdStreamAck    = "streamack"
 )
 
 // Message is an interface that describes a bitcoin message.  A type that
@@ -137,6 +141,15 @@ func makeEmptyMessage(command string) (Message, error) {
 
 	case CmdFeeFilter:
 		msg = &MsgFeeFilter{}
+
+	case CmdProtoConf:
+		msg = &MsgProtoConf{}
+
+	case CmdCreateStream:
+		msg = &MsgCreateStream{}
+
+	case CmdStreamAck:
+		msg = &MsgStreamAck{}
 
 	default:
 		return nil, fmt.Errorf("unhandled command [%s]", command)

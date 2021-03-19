@@ -6,7 +6,6 @@ package txscript
 
 import (
 	"fmt"
-
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcutil"
 )
@@ -80,6 +79,16 @@ func isPubkey(pops []parsedOpcode) bool {
 	return len(pops) == 2 &&
 		(len(pops[0].data) == 33 || len(pops[0].data) == 65) &&
 		pops[1].opcode.value == OP_CHECKSIG
+}
+
+// IsPubKey returns true if the script is in the standard
+// pay-to-pub-key (P2PK) format, false otherwise.
+func IsPubKey(script []byte) bool {
+	if (len(script) == 35 && script[0] == OP_DATA_33 && script[34] == OP_CHECKSIG) ||
+		(len(script) == 67 && script[0] == OP_DATA_65 && script[66] == OP_CHECKSIG) {
+		return true
+	}
+	return false
 }
 
 // isPubkeyHash returns true if the script passed is a pay-to-pubkey-hash
@@ -412,6 +421,8 @@ func PushedData(script []byte) ([][]byte, error) {
 			data = append(data, pop.data)
 		} else if pop.opcode.value == OP_0 {
 			data = append(data, nil)
+		} else if pop.opcode.value >= OP_1 && pop.opcode.value <= OP_16 {
+			data = append(data, []byte{pop.opcode.value - OP_1 + 1})
 		}
 	}
 	return data, nil

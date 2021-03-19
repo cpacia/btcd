@@ -6,6 +6,7 @@ package txscript
 
 import (
 	"bytes"
+	"encoding/hex"
 	"reflect"
 	"testing"
 
@@ -773,6 +774,47 @@ func TestCalcMultiSigStats(t *testing.T) {
 		if e := tstCheckScriptError(err, test.err); e != nil {
 			t.Errorf("CalcMultiSigStats #%d (%s): %v", i, test.name,
 				e)
+			continue
+		}
+	}
+}
+
+// isPubKeyTests houses test scripts used to ensure testing for
+// pub key is working as expected.
+var isPubKeyTests = []struct {
+	name string
+	raw  string
+	isPK bool
+}{
+	{
+		name: "P2PK 65 Byte Normal",
+		raw: "41047211a824f55b505228e4c3d5194c1fcfaa15a456a" +
+			"bdf37f9b9d97a4040afc073dee6c89064984f03385237" +
+			"d92167c13e236446b417ab79a0fcae412ae3316b77ac",
+		isPK: true,
+	},
+	{
+		name: "P2PK 33 Byte Compressed",
+		raw:  "21030e7061b9fb18571cf2441b2a7ee2419933ddaa423bc178672cd11e87911616d1ac",
+		isPK: true,
+	},
+	{
+		name: "Non P2PK Tx",
+		raw:  "76a914e02e0ab4fd6bb2bbfa48e81e99a011a616e700e488ac",
+		isPK: false,
+	},
+}
+
+// TestIsPubKey ensures isPubKeyTests have expected results.
+func TestIsPubKey(t *testing.T) {
+	t.Parallel()
+
+	for _, test := range isPubKeyTests {
+		script, _ := hex.DecodeString(test.raw)
+		isPubKey := IsPubKey(script)
+		if isPubKey != test.isPK {
+			t.Errorf("%s: expected %t got %t (script %x)", test.name,
+				test.isPK, isPubKey, script)
 			continue
 		}
 	}

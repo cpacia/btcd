@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/jchavannes/btcd/wire"
 )
 
 // Bip16Activation is the timestamp where BIP0016 is valid to use in the
@@ -33,14 +33,14 @@ const (
 
 	// sigHashMask defines the number of bits of the hash type which is used
 	// to identify which outputs are signed.
-	sigHashMask = 0x1f
+	SigHashMask = 0x1f
 )
 
 // These are the constants specified for maximums in individual scripts.
 const (
 	MaxOpsPerScript       = 201 // Max number of non-push operations.
 	MaxPubKeysPerMultiSig = 20  // Multisig can't have more sigs than this.
-	MaxScriptElementSize  = 520 // Max bytes pushable to the stack.
+	MaxScriptElementSize  = 99500 // Max bytes pushable to the stack.
 )
 
 // isSmallInt returns whether or not the opcode is considered a small integer,
@@ -303,7 +303,7 @@ func calcSignatureHash(script []parsedOpcode, hashType SigHashType, tx *wire.Msg
 	// hash of 1.  This in turn presents an opportunity for attackers to
 	// cleverly construct transactions which can steal those coins provided
 	// they can reuse signatures.
-	if hashType&sigHashMask == SigHashSingle && idx >= len(tx.TxOut) {
+	if hashType&SigHashMask == SigHashSingle && idx >= len(tx.TxOut) {
 		var hash chainhash.Hash
 		hash[0] = 0x01
 		return hash[:]
@@ -326,7 +326,7 @@ func calcSignatureHash(script []parsedOpcode, hashType SigHashType, tx *wire.Msg
 		}
 	}
 
-	switch hashType & sigHashMask {
+	switch hashType & SigHashMask {
 	case SigHashNone:
 		txCopy.TxOut = txCopy.TxOut[0:0] // Empty slice.
 		for i := range txCopy.TxIn {
@@ -476,8 +476,8 @@ hashType SigHashType, tx *wire.MsgTx, idx int, amt int64) []byte {
 	// cached hash sequences, otherwise write all zeroes for the
 	// hashSequence.
 	if hashType&SigHashAnyOneCanPay == 0 &&
-		hashType&sigHashMask != SigHashSingle &&
-		hashType&sigHashMask != SigHashNone {
+		hashType&SigHashMask != SigHashSingle &&
+		hashType&SigHashMask != SigHashNone {
 		sigHash.Write(sigHashes.HashSequence[:])
 	} else {
 		sigHash.Write(zeroHash[:])
@@ -512,7 +512,7 @@ hashType SigHashType, tx *wire.MsgTx, idx int, amt int64) []byte {
 	if hashType&SigHashSingle != SigHashSingle &&
 		hashType&SigHashNone != SigHashNone {
 		sigHash.Write(sigHashes.HashOutputs[:])
-	} else if hashType&sigHashMask == SigHashSingle && idx < len(tx.TxOut) {
+	} else if hashType&SigHashMask == SigHashSingle && idx < len(tx.TxOut) {
 		var b bytes.Buffer
 		wire.WriteTxOut(&b, 0, 0, tx.TxOut[idx])
 		sigHash.Write(chainhash.DoubleHashB(b.Bytes()))

@@ -18,9 +18,9 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/blockchain"
-	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/jchavannes/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/jchavannes/btcd/wire"
 	"github.com/btcsuite/go-socks/socks"
 	"github.com/davecgh/go-spew/spew"
 )
@@ -170,6 +170,8 @@ type MessageListeners struct {
 	// OnSendHeaders is invoked when a peer receives a sendheaders bitcoin
 	// message.
 	OnSendHeaders func(p *Peer, msg *wire.MsgSendHeaders)
+
+	OnProtoConf func(p *Peer, msg *wire.MsgProtoConf)
 
 	// OnRead is invoked when a peer receives a bitcoin message.  It
 	// consists of the number of bytes read, the message, and whether or not
@@ -1439,6 +1441,8 @@ out:
 				p.PushRejectMsg("malformed", wire.RejectMalformed, errMsg, nil,
 					true)
 			}
+			errMsg := fmt.Sprintf("Unknown error with message %s: %v", p, err)
+			log.Criticalf(errMsg)
 			break out
 		}
 		atomic.StoreInt64(&p.lastRecv, time.Now().Unix())
@@ -1578,6 +1582,11 @@ out:
 
 			if p.cfg.Listeners.OnSendHeaders != nil {
 				p.cfg.Listeners.OnSendHeaders(p, msg)
+			}
+
+		case *wire.MsgProtoConf:
+			if p.cfg.Listeners.OnProtoConf != nil {
+				p.cfg.Listeners.OnProtoConf(p, msg)
 			}
 
 		default:

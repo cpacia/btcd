@@ -37,7 +37,7 @@ func TestMerkleBlock(t *testing.T) {
 
 	// Ensure max payload is expected value for latest protocol version.
 	// Num addresses (varInt) + max allowed addresses.
-	wantPayload := uint32(1000000)
+	wantPayload := uint32(MaxBlockPayload)
 	maxPayload := msg.MaxPayloadLength(pver)
 	if maxPayload != wantPayload {
 		t.Errorf("MaxPayloadLength: wrong max payload length for "+
@@ -45,64 +45,82 @@ func TestMerkleBlock(t *testing.T) {
 			maxPayload, wantPayload)
 	}
 
-	// Load maxTxPerBlock hashes
-	data := make([]byte, 32)
-	for i := 0; i < maxTxPerBlock; i++ {
-		rand.Read(data)
-		hash, err := chainhash.NewHash(data)
-		if err != nil {
-			t.Errorf("NewHash failed: %v\n", err)
-			return
-		}
+	// limits are tested elsewhere, so here we can test with a relatively
+	// small number of hashes.
+	hashCount := 10
 
-		if err = msg.AddTxHash(hash); err != nil {
+	// Load hashes
+	for i := 0; i < hashCount; i++ {
+		hash := newRandomHash()
+
+		if err := msg.AddTxHash(hash); err != nil {
 			t.Errorf("AddTxHash failed: %v\n", err)
 			return
 		}
 	}
 
-	// Add one more Tx to test failure.
-	rand.Read(data)
-	hash, err := chainhash.NewHash(data)
-	if err != nil {
-		t.Errorf("NewHash failed: %v\n", err)
-		return
-	}
-
-	if err = msg.AddTxHash(hash); err == nil {
-		t.Errorf("AddTxHash succeeded when it should have failed")
-		return
-	}
-
 	// Test encode with latest protocol version.
 	var buf bytes.Buffer
-	err = msg.BtcEncode(&buf, pver)
-	if err != nil {
-		t.Errorf("encode of MsgMerkleBlock failed %v err <%v>", msg, err)
+	if err := msg.BtcEncode(&buf, pver); err != nil {
+		t.Fatalf("encode of MsgMerkleBlock failed %v err <%v>", msg, err)
 	}
 
 	// Test decode with latest protocol version.
 	readmsg := MsgMerkleBlock{}
-	err = readmsg.BtcDecode(&buf, pver)
-	if err != nil {
-		t.Errorf("decode of MsgMerkleBlock failed [%v] err <%v>", buf, err)
+	if err := readmsg.BtcDecode(&buf, pver); err != nil {
+		t.Fatalf("decode of MsgMerkleBlock failed [%v] err <%v>", buf, err)
 	}
+}
 
-	// Force extra hash to test maxTxPerBlock.
+func TestMerkleBlock_AddTxTooMany(t *testing.T) {
+	msg := buildMsgMerkleBlock()
+
+	// set the hashes at maximum capacity
+	msg.Hashes = make([]*chainhash.Hash, maxTxPerBlock, maxTxPerBlock)
+
+	hash := newRandomHash()
+
+	// Add one more Tx to test failure.
+	if err := msg.AddTxHash(hash); err == nil {
+		t.Fatalf("AddTxHash succeeded when it should have failed")
+	}
+}
+
+func TestMerkleBlock_TooManyHashes(t *testing.T) {
+	msg := buildMsgMerkleBlock()
+
+	// set the hashes at maximum capacity
+	msg.Hashes = make([]*chainhash.Hash, maxTxPerBlock, maxTxPerBlock)
+
+	hash := newRandomHash()
+
+	// Force extra hash to test maxTxPerBlock when encoding.
 	msg.Hashes = append(msg.Hashes, hash)
-	err = msg.BtcEncode(&buf, pver)
-	if err == nil {
-		t.Errorf("encode of MsgMerkleBlock succeeded with too many " +
+
+	var buf bytes.Buffer
+	if err := msg.BtcEncode(&buf, ProtocolVersion); err == nil {
+		t.Fatalf("encode of MsgMerkleBlock succeeded with too many " +
 			"tx hashes when it should have failed")
-		return
+	}
+}
+
+func TestMerkleBlock_TooManyFlags(t *testing.T) {
+	msg := buildMsgMerkleBlock()
+
+	hash := newRandomHash()
+
+	// add a hash
+	if err := msg.AddTxHash(hash); err != nil {
+		t.Fatalf("AddTxHash failed: %v\n", err)
 	}
 
 	// Force too many flag bytes to test maxFlagsPerMerkleBlock.
 	// Reset the number of hashes back to a valid value.
 	msg.Hashes = msg.Hashes[len(msg.Hashes)-1:]
 	msg.Flags = make([]byte, maxFlagsPerMerkleBlock+1)
-	err = msg.BtcEncode(&buf, pver)
-	if err == nil {
+	var buf bytes.Buffer
+
+	if err := msg.BtcEncode(&buf, ProtocolVersion); err == nil {
 		t.Errorf("encode of MsgMerkleBlock succeeded with too many " +
 			"flag bytes when it should have failed")
 		return
@@ -423,4 +441,33 @@ var merkleBlockOneBytes = []byte{
 	0xcd, 0xb6, 0x06, 0xe8, 0x57, 0x23, 0x3e, 0x0e, // Hash
 	0x01, // Num flag bytes
 	0x80, // Flags
+}
+
+// buildMsgMerkleBlock is a helper function that returns a *MsgMerkleBlock
+// for unit testing.
+func buildMsgMerkleBlock() *MsgMerkleBlock {
+	prevHash := &blockOne.Header.PrevBlock
+	merkleHash := &blockOne.Header.MerkleRoot
+	bits := blockOne.Header.Bits
+	nonce := blockOne.Header.Nonce
+
+	bh := NewBlockHeader(1, prevHash, merkleHash, bits, nonce)
+
+	return NewMsgMerkleBlock(bh)
+}
+
+// newRandomHash returns a new random hash for testing.
+//
+// If creation of the hash fails, the function will panic. It is not
+// recommended to do this in production.
+func newRandomHash() *chainhash.Hash {
+	data := make([]byte, 32)
+	rand.Read(data)
+
+	h, err := chainhash.NewHash(data)
+	if err != nil {
+		panic(err)
+	}
+
+	return h
 }

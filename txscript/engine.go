@@ -9,7 +9,7 @@ import (
 	"math/big"
 
 	"github.com/btcsuite/btcd/btcec"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/jchavannes/btcd/wire"
 )
 
 // ScriptFlags is a bitmask defining additional operations or tests that will be
@@ -81,7 +81,7 @@ const (
 	MaxStackSize = 1000
 
 	// MaxScriptSize is the maximum allowed length of a raw script.
-	MaxScriptSize = 10000
+	MaxScriptSize = 100000
 )
 
 // halforder is used to tame ECDSA malleability (see BIP0062).
